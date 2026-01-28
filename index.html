@@ -1,0 +1,1713 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>GO Taipei 101！</title>
+    <link rel="icon" href="favicon.ico">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: "Microsoft JhengHei", Arial, sans-serif;
+            background-color: #87CEEB;
+            touch-action: none; 
+        }
+
+        #ui-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            pointer-events: none;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #bgm-btn {
+            pointer-events: auto;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid white;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            width: fit-content;
+            font-size: 16px;
+        }
+        #bgm-btn:hover { background: rgba(255, 255, 255, 0.2); }
+
+        #timer-display {
+            font-size: 36px;
+            font-weight: bold;
+            color: #ffff00;
+            font-family: monospace;
+        }
+
+        #height-display { font-size: 24px; font-weight: bold; color: #00ffcc; letter-spacing: 1px; }
+        
+        #wind-display { font-size: 16px; color: #aaffaa; margin-top: 2px; }
+        
+        #wind-warning { color: #ff3d00; font-weight: bold; display: none; margin-top: 5px; animation: blink 0.5s infinite; }
+        #obstacle-warning { color: #ffeb3b; font-weight: bold; display: none; margin-top: 5px; text-shadow: 0 0 5px orange; }
+        
+        @keyframes blink { from { opacity: 1; } to { opacity: 0.3; } }
+
+        /* 平衡條樣式 */
+        #balance-container {
+            position: absolute;
+            bottom: 120px; 
+            left: 50%;
+            transform: translateX(-50%);
+            width: 280px; 
+            height: 20px; 
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #aaa;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            display: none; /* 初始隱藏 */
+        }
+
+        #balance-pointer {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 4px;
+            height: 100%;
+            background: #ff4444;
+            transform: translateX(-50%);
+            box-shadow: 0 0 5px #ff4444;
+            transition: left 0.05s linear;
+        }
+
+        #balance-safe-zone {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            width: 100px;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 127, 0.4), transparent);
+            transform: translateX(-50%);
+            transition: width 0.3s ease;
+        }
+
+        /* 體力條樣式 */
+        #stamina-container {
+            position: absolute;
+            bottom: 90px; 
+            left: 50%;
+            transform: translateX(-50%);
+            width: 280px;
+            height: 15px; 
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            display: none;
+        }
+
+        #stamina-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #ffeb3b, #ff9800);
+            transform-origin: left;
+            transition: transform 0.1s linear;
+        }
+
+        #stamina-text {
+            position: absolute;
+            bottom: 92px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            color: #fff;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px black;
+            display: none;
+            z-index: 11;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            /* 移除原本的黑色背景，改由個別元素控制或在特定狀態下覆寫 */
+            background: rgba(0, 0, 0, 0); 
+            color: white;
+            z-index: 100;
+            text-align: center;
+            pointer-events: none; /* 預設不擋滑鼠，特定子元素再開啟 */
+            box-sizing: border-box;
+        }
+
+        /* 開始畫面的特殊樣式 */
+        #start-screen {
+            /* 上方深色漸層，確保白色文字可讀，但下方保持透明 */
+            background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 60%);
+            justify-content: flex-start; /* 內容靠上，避開畫面中間的主角 */
+            padding-top: 80px;
+            pointer-events: auto; /* 開始畫面需要互動 */
+        }
+
+        /* 勝利畫面/失敗畫面 */
+        #game-over-screen {
+            background: rgba(0, 0, 0, 0.85); /* 遊戲結束時恢復深色背景比較清楚 */
+            pointer-events: auto;
+            backdrop-filter: blur(5px);
+        }
+
+        /* 勝利畫面特殊樣式 */
+        .win-mode {
+            background: rgba(0, 0, 0, 0) !important; /* 透明背景 */
+            backdrop-filter: none !important; /* 移除模糊 */
+            justify-content: space-between !important; /* 上下分佈 */
+            padding-top: 80px;
+            padding-bottom: 80px;
+            pointer-events: none; /* 讓點擊穿透到背景 */
+        }
+        
+        .win-mode * {
+            pointer-events: auto; /* 按鈕恢復可點擊 */
+            text-shadow: 2px 2px 4px #00000055, 0 0 10px #00000011, 0 0 20px #00000011 !important;
+        }
+
+        .hidden { display: none !important; }
+
+        button.start-btn-style {
+            padding: 16px 48px;
+            font-size: 24px;
+            cursor: pointer;
+            background: linear-gradient(135deg, #00d2ff, #3a7bd5);
+            color: white;
+            border: none;
+            border-radius: 40px;
+            margin-top: 30px;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+            pointer-events: auto;
+        }
+
+        button.start-btn-style:hover { transform: scale(1.05); }
+
+        /* 排行榜按鈕 (獎盃) */
+        #leaderboard-btn {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            font-size: 40px;
+            cursor: pointer;
+            filter: drop-shadow(0 0 5px rgba(255,215,0,0.8));
+            transition: transform 0.2s;
+            pointer-events: auto;
+            z-index: 101;
+        }
+        #leaderboard-btn:hover { transform: scale(1.2); }
+
+        /* 排行榜 Modal */
+        #leaderboard-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 20, 30, 0.95);
+            border: 2px solid #ffd700;
+            border-radius: 20px;
+            padding: 30px;
+            width: 300px;
+            text-align: center;
+            z-index: 200;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            display: none;
+            pointer-events: auto;
+        }
+        
+        #leaderboard-modal h2 { margin-top: 0; color: #ffd700; }
+        
+        #leaderboard-list {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 18px;
+            color: #eee;
+        }
+        
+        #leaderboard-list li {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        #leaderboard-list li:first-child { color: #ffd700; font-weight: bold; }
+        #leaderboard-list li:nth-child(2) { color: #c0c0c0; }
+        #leaderboard-list li:nth-child(3) { color: #cd7f32; }
+
+        #close-lb-btn {
+            background: #444;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #close-lb-btn:hover { background: #666; }
+
+        /* 標題與教學容器調整 */
+        .title-container {
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px rgba(0,0,0,0.8); /* 增強陰影 */
+        }
+
+        .tutorial-box {
+            background: rgba(0,0,0,0.5); 
+            padding: 20px; 
+            border-radius: 15px; 
+            max-width: 500px; 
+            text-align: left;
+            margin-bottom: 20px;
+            backdrop-filter: blur(2px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        #mobile-ui {
+            position: absolute;
+            bottom: 130px;
+            width: 100%;
+            height: 120px;
+            display: none;
+            justify-content: flex-start;
+            align-items: flex-end;
+            pointer-events: none;
+            z-index: 50;
+            padding: 0 30px;
+            box-sizing: border-box;
+        }
+
+        #joystick-zone {
+            width: 90px;
+            height: 90px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            position: relative;
+            pointer-events: auto;
+            backdrop-filter: blur(2px);
+            margin-bottom: 10px;
+        }
+
+        #joystick-stick {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 5px rgba(0,0,0,0.2);
+            pointer-events: none;
+        }
+
+        #mobile-jump-btn {
+            width: 70px;
+            height: 70px;
+            background: rgba(255, 200, 0, 0.5);
+            border: 2px solid rgba(255, 235, 59, 0.7);
+            border-radius: 50%;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            user-select: none;
+            backdrop-filter: blur(2px);
+            box-shadow: 0 0 10px rgba(255, 200, 0, 0.2);
+            text-shadow: 1px 1px 2px black;
+            margin-bottom: 20px;
+        }
+
+        #mobile-jump-btn:active {
+            background: rgba(255, 200, 0, 0.8);
+            transform: scale(0.95);
+        }
+
+        @media (max-width: 1024px) {
+            #mobile-ui { display: flex; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-container">
+        <button id="bgm-btn">🎵 音樂：開</button>
+        <div id="timer-display">00:00.00</div>
+        <div id="height-display">高度: 0m</div>
+        <div id="wind-display">風速: 0 km/h</div>
+        <div id="wind-warning">⚠️ 強風來襲！請抓緊！</div>
+        <div id="obstacle-warning">🧱 遇到屋簷！按跳躍鍵蓄力</div>
+    </div>
+
+    <div id="stamina-text">體力值</div>
+    <div id="stamina-container">
+        <div id="stamina-bar"></div>
+    </div>
+
+    <div id="balance-container">
+        <div id="balance-safe-zone"></div>
+        <div id="balance-pointer"></div>
+    </div>
+
+    <div id="start-screen" class="overlay">
+        <!-- 排行榜按鈕 -->
+        <div id="leaderboard-btn" title="查看排行榜">🏆</div>
+
+        <div class="title-container">
+            <h1 style="color: #00ffcc; font-size: 56px; margin: 0;">GO Taipei 101！</h1>
+        </div>
+        
+        <div class="tutorial-box">
+            <h3 style="color: #ffeb3b; margin-top: 0; text-align: center; border-bottom: 1px solid #666; padding-bottom: 10px;">🎮 遊戲教學</h3>
+            <ul style="line-height: 1.6; color: #eee; padding-left: 20px; margin-bottom: 0;">
+                <li><b>移動/攀爬：</b> 方向鍵 / 搖桿</li>
+                <li><b>保持平衡：</b> 當風吹來時，按反方向抵抗強風</li>
+                <li><b>跳躍：</b> 按 <b>空白鍵</b> / 快速點擊搖桿</li>
+                <li style="color: #ff4444; font-weight: bold;"><b>危險警告：</b> 強風來襲時切勿跳躍，否則會直接被吹落！</li>
+                <li><b>目標：</b> 攻頂 508 公尺，成為最速傳說！</li>
+            </ul>
+        </div>
+
+        <button id="start-btn" class="start-btn-style">開始遊戲</button>
+    </div>
+
+    <!-- 排行榜 Modal -->
+    <div id="leaderboard-modal">
+        <h2>🏆 極速風雲榜</h2>
+        <ul id="leaderboard-list">
+            <!-- JS 會填入內容 -->
+            <li>讀取中...</li>
+        </ul>
+        <button id="close-lb-btn">關閉</button>
+    </div>
+
+    <div id="game-over-screen" class="overlay hidden">
+        <div>
+            <h1 id="result-title" style="font-size: 48px; margin-bottom: 10px;">攻頂完成！</h1>
+            <p id="result-text" style="font-size: 32px; color: #ffff00;"></p>
+        </div>
+        <button id="restart-btn" class="start-btn-style">返回封面</button>
+    </div>
+
+    <div id="mobile-ui">
+        <div id="joystick-zone">
+            <div id="joystick-stick"></div>
+        </div>
+        <div id="mobile-jump-btn" style="display: none;">跳躍</div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // ===========================================
+        const PLAYER_CLIMB_SPEED = 5; 
+        const GUST_FORCE = 120; // 大風強度變數，可在此調整
+        // ===========================================
+
+        // 排行榜系統
+        const Leaderboard = {
+            key: 'taipei101_records',
+            save: function(timeStr) {
+                const parts = timeStr.split(':');
+                const seconds = parseFloat(parts[0]) * 60 + parseFloat(parts[1]);
+                const record = { timeStr: timeStr, seconds: seconds, date: new Date().toLocaleDateString() };
+                
+                let records = JSON.parse(localStorage.getItem(this.key) || '[]');
+                records.push(record);
+                records.sort((a, b) => a.seconds - b.seconds);
+                records = records.slice(0, 5); // Keep top 5
+                localStorage.setItem(this.key, JSON.stringify(records));
+                this.updateDisplay();
+            },
+            updateDisplay: function() {
+                const list = document.getElementById('leaderboard-list');
+                if(!list) return;
+                const records = JSON.parse(localStorage.getItem(this.key) || '[]');
+                
+                if(records.length === 0) {
+                    list.innerHTML = '<li style="text-align:center; color:#aaa;">尚無紀錄，快來挑戰！</li>';
+                    return;
+                }
+
+                list.innerHTML = records.map((r, i) => 
+                    `<li>
+                        <span>#${i+1}</span> 
+                        <span>${r.timeStr}</span> 
+                        <span style="font-size:12px; opacity:0.7">${r.date}</span>
+                    </li>`
+                ).join('');
+            },
+            setupUI: function() {
+                const btn = document.getElementById('leaderboard-btn');
+                const modal = document.getElementById('leaderboard-modal');
+                const closeBtn = document.getElementById('close-lb-btn');
+                
+                if(btn && modal && closeBtn) {
+                    btn.onclick = () => {
+                        this.updateDisplay();
+                        modal.style.display = 'block';
+                    };
+                    closeBtn.onclick = () => {
+                        modal.style.display = 'none';
+                    };
+                }
+            }
+        };
+
+        const AudioController = {
+            ctx: null, windNode: null, windGain: null, bgmGain: null, masterGain: null,
+            stepBuffer: null, bgmTimer: null, isInit: false, isBgmOn: true,
+            bgmAudio: null, useExternalBGM: false,
+
+            init: function() {
+                if (this.isInit) return;
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                    this.masterGain = this.ctx.createGain();
+                    this.masterGain.gain.value = 1.0;
+                    this.masterGain.connect(this.ctx.destination);
+                    
+                    this.createStepBuffer(); 
+                    this.createWind();
+                    
+                    this.bgmAudio = new Audio('bgm.mp3');
+                    this.bgmAudio.loop = true;
+                    this.bgmAudio.volume = 0.5;
+                    
+                    const self = this;
+                    this.bgmAudio.addEventListener('canplaythrough', function() {
+                        self.useExternalBGM = true;
+                        if (self.isBgmOn) self.bgmAudio.play().catch(e => console.log("Auto-play prevented", e));
+                    });
+                    
+                    this.bgmAudio.addEventListener('error', function() {
+                        self.useExternalBGM = false;
+                        if (self.isBgmOn) self.playHappyBGM();
+                    });
+
+                    setTimeout(() => {
+                        if (!self.useExternalBGM && (!self.bgmAudio || self.bgmAudio.readyState < 3)) {
+                             if (self.isBgmOn && !self.bgmTimer) self.playHappyBGM();
+                        }
+                    }, 500);
+
+                    this.isInit = true;
+                } catch(e) { console.error("Audio init failed", e); }
+            },
+            
+            toggleBGM: function() {
+                this.isBgmOn = !this.isBgmOn;
+                
+                if (ui && ui.bgmBtn) {
+                    if (this.isBgmOn) {
+                        ui.bgmBtn.innerText = "🎵 音樂：開"; ui.bgmBtn.style.opacity = "1";
+                        if (this.useExternalBGM && this.bgmAudio) {
+                            this.bgmAudio.play();
+                        } else {
+                            if (this.bgmGain) this.bgmGain.gain.setTargetAtTime(0.4, this.ctx.currentTime, 0.1);
+                            else this.playHappyBGM();
+                        }
+                    } else {
+                        ui.bgmBtn.innerText = "🎵 音樂：關"; ui.bgmBtn.style.opacity = "0.5";
+                        if (this.useExternalBGM && this.bgmAudio) {
+                            this.bgmAudio.pause();
+                        } else {
+                            if (this.bgmGain) this.bgmGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
+                        }
+                    }
+                }
+            },
+            
+            resume: function() { 
+                if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); 
+                if (this.isBgmOn && this.useExternalBGM && this.bgmAudio && this.bgmAudio.paused) {
+                    this.bgmAudio.play();
+                }
+            },
+            
+            createStepBuffer: function() {
+                const bufferSize = this.ctx.sampleRate * 0.05;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.8; 
+                this.stepBuffer = buffer;
+            },
+            
+            createWind: function() {
+                const bufferSize = this.ctx.sampleRate * 2;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                let lastOut = 0;
+                for (let i = 0; i < bufferSize; i++) {
+                    const white = Math.random() * 2 - 1;
+                    data[i] = (lastOut + (0.02 * white)) / 1.02; lastOut = data[i]; data[i] *= 3.5;
+                }
+                const noise = this.ctx.createBufferSource(); noise.buffer = buffer; noise.loop = true;
+                const filter = this.ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 200;
+                this.windGain = this.ctx.createGain(); this.windGain.gain.value = 0.2; 
+                noise.connect(filter); filter.connect(this.windGain); this.windGain.connect(this.masterGain);
+                noise.start(); this.windNode = filter;
+            },
+            
+            playHappyBGM: function() {
+                if (this.useExternalBGM) return;
+                if (!this.ctx) return;
+                if (this.bgmTimer) return;
+
+                this.bgmGain = this.ctx.createGain(); this.bgmGain.gain.value = 0.4; this.bgmGain.connect(this.masterGain);
+                const melody = [
+                    {f: 261.6, d: 0.2}, {f: 329.6, d: 0.2}, {f: 392.0, d: 0.2}, {f: 523.3, d: 0.4}, 
+                    {f: 392.0, d: 0.2}, {f: 329.6, d: 0.2}, {f: 261.6, d: 0.4}, {f: 0, d: 0.2},      
+                    {f: 293.7, d: 0.2}, {f: 349.2, d: 0.2}, {f: 440.0, d: 0.2}, {f: 587.3, d: 0.4}, 
+                    {f: 440.0, d: 0.2}, {f: 349.2, d: 0.2}, {f: 293.7, d: 0.4}, {f: 0, d: 0.2},      
+                    {f: 329.6, d: 0.2}, {f: 392.0, d: 0.2}, {f: 523.3, d: 0.2}, {f: 659.3, d: 0.4}, 
+                    {f: 523.3, d: 0.2}, {f: 392.0, d: 0.2}, {f: 329.6, d: 0.4}, {f: 0, d: 0.2}      
+                ];
+                let noteIndex = 0; let nextNoteTime = this.ctx.currentTime;
+                const scheduler = () => {
+                    if (!this.isBgmOn) nextNoteTime = this.ctx.currentTime; 
+                    if (this.useExternalBGM) {
+                        this.bgmTimer = null;
+                        return;
+                    }
+
+                    while (nextNoteTime < this.ctx.currentTime + 0.1) {
+                        if (this.isBgmOn) {
+                            const note = melody[noteIndex];
+                            if (note.f > 0) {
+                                const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                                osc.type = 'triangle'; osc.frequency.value = note.f;
+                                gain.gain.setValueAtTime(0.3, nextNoteTime); 
+                                gain.gain.exponentialRampToValueAtTime(0.01, nextNoteTime + note.d - 0.05);
+                                osc.connect(gain); gain.connect(this.bgmGain); osc.start(nextNoteTime); osc.stop(nextNoteTime + note.d);
+                            }
+                        }
+                        const note = melody[noteIndex]; nextNoteTime += note.d; noteIndex = (noteIndex + 1) % melody.length;
+                    }
+                    this.bgmTimer = requestAnimationFrame(scheduler);
+                };
+                scheduler();
+            },
+            updateWind: function(height, maxH) {
+                if (!this.ctx || !this.windNode) return;
+                const progress = Math.max(0, height / maxH);
+                const vol = 0.2 + progress * 0.6; const freq = 200 + progress * 1200; 
+                this.windGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.1);
+                this.windNode.frequency.setTargetAtTime(freq, this.ctx.currentTime, 0.1);
+            },
+            stopWind: function() {
+                if (!this.ctx || !this.windGain) return;
+                this.windGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
+            },
+            playStep: function() {
+                if (!this.ctx || !this.stepBuffer) return;
+                const source = this.ctx.createBufferSource(); source.buffer = this.stepBuffer;
+                const gain = this.ctx.createGain(); source.playbackRate.value = 0.8 + Math.random() * 0.4;
+                gain.gain.value = 0.8; const filter = this.ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 600;
+                source.connect(filter); filter.connect(gain); gain.connect(this.masterGain); source.start();
+            },
+            playCharge: function() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                osc.type = 'sine'; osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(600, this.ctx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.4, this.ctx.currentTime); gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.2);
+                osc.connect(gain); gain.connect(this.masterGain); osc.start(); osc.stop(this.ctx.currentTime + 0.2);
+            },
+            playJump: function() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                osc.type = 'square'; osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.2);
+                osc.connect(gain); gain.connect(this.masterGain); osc.start(); osc.stop(this.ctx.currentTime + 0.2);
+            },
+            playFall: function() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 1.5);
+                gain.gain.setValueAtTime(0.5, this.ctx.currentTime); gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 1.5);
+                osc.connect(gain); gain.connect(this.masterGain); osc.start(); osc.stop(this.ctx.currentTime + 1.5);
+            },
+            playCheer: function() {
+                if (!this.ctx) return;
+                const duration = 1.5; const bufferSize = this.ctx.sampleRate * duration;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.5;
+                const noise = this.ctx.createBufferSource(); noise.buffer = buffer;
+                const gain = this.ctx.createGain(); const now = this.ctx.currentTime;
+                gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(0.5, now + 0.2); gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+                const filter = this.ctx.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = 1000; filter.Q.value = 1;
+                noise.connect(filter); filter.connect(gain); gain.connect(this.masterGain); noise.start();
+                const whistle = this.ctx.createOscillator(); const wGain = this.ctx.createGain();
+                whistle.frequency.setValueAtTime(1500, now); whistle.frequency.linearRampToValueAtTime(2000, now + 0.3);
+                wGain.gain.setValueAtTime(0, now); wGain.gain.linearRampToValueAtTime(0.1, now + 0.1); wGain.gain.linearRampToValueAtTime(0, now + 0.3);
+                whistle.connect(wGain); wGain.connect(this.masterGain); whistle.start(); whistle.stop(now + 0.4);
+            },
+            playWin: function() {
+                if (!this.ctx) return;
+                const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98]; 
+                notes.forEach((freq, i) => {
+                    const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                    osc.type = 'square'; const start = this.ctx.currentTime + i * 0.1;
+                    osc.frequency.setValueAtTime(freq, start);
+                    gain.gain.setValueAtTime(0, start); gain.gain.linearRampToValueAtTime(0.3, start + 0.05); gain.gain.exponentialRampToValueAtTime(0.001, start + 0.5);
+                    osc.connect(gain); gain.connect(this.masterGain); osc.start(start); osc.stop(start + 0.5);
+                });
+                this.playCheer(); 
+            }
+        };
+
+        // --- 遊戲參數 ---
+        let scene, camera, renderer, clock;
+        let building, player, crowdSystem, windLines, cloudSystem; 
+        let playerBody, armL, armR, legL, legR;
+        let phoneMesh; 
+        let obstacleGroup; 
+        let flags = []; // 儲存國旗物件以進行動畫
+        
+        let gameState = 'START'; 
+        let playerMode = 'WALK'; 
+        
+        let height = 0; 
+        let balance = 0; 
+        let walkZ = 85;  
+        let walkX = 0;    
+
+        let startTime = 0;
+        let finalTime = 0;
+        let isTiming = false;
+
+        let stamina = 200;
+        const MAX_STAMINA = 200; 
+        let animCycle = 0; 
+        let lastStepCycle = 0; 
+        let lastSectionIndex = 0; 
+        
+        let climbVelocity = 0;
+        const CLIMB_ACCEL = 8.0; 
+        const CLIMB_FRICTION = 2.0; 
+        const MAX_CLIMB_SPEED = PLAYER_CLIMB_SPEED; 
+        
+        let fallVelocity = 0;
+
+        let jumpState = 'IDLE'; 
+        let jumpPrepTimer = 0;
+        const JUMP_PREP_DURATION = 0.2; 
+        let jumpTime = 0;
+        const JUMP_DURATION = 0.8; 
+        let currentJumpZOffset = 0; 
+
+        let windBias = 0;
+        let gustStrength = 0;
+        let isWindGusting = false;
+        let nextWindDirection = 1;
+
+        const MAX_HEIGHT = 508;
+        const BALANCE_LIMIT = 100;
+
+        const keys = { up: false, down: false, left: false, right: false, space: false };
+        let spacePressed = false;
+        
+        const joystick = { x: 0, y: 0, active: false };
+
+        // 全域 UI 快取
+        const ui = {};
+
+        // --- 初始化 ---
+        function init() {
+            clock = new THREE.Clock();
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            scene.fog = new THREE.Fog(0x87CEEB, 20, 1200); 
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 3000);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+
+            const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(ambient);
+            const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            sunLight.position.set(100, 300, 100);
+            sunLight.castShadow = true;
+            sunLight.shadow.camera.near = 0.5;
+            sunLight.shadow.camera.far = 2000;
+            sunLight.shadow.mapSize.width = 2048;
+            sunLight.shadow.mapSize.height = 2048;
+            scene.add(sunLight);
+
+            createSurroundings();
+            createCrowd(); 
+            createRealistic101(); 
+            createClouds();
+            createDetailedPlayer(); 
+            createWindVFX(); 
+
+            // 初始隨機風向
+            nextWindDirection = Math.random() < 0.5 ? 1 : -1;
+
+            window.addEventListener('resize', onWindowResize);
+            setupInput();
+            setupJoystick(); 
+            
+            // 初始化 UI 快取
+            ui.timerDisplay = document.getElementById('timer-display');
+            ui.heightDisplay = document.getElementById('height-display');
+            ui.windDisplay = document.getElementById('wind-display');
+            ui.modeDisplay = document.getElementById('mode-display');
+            ui.windWarning = document.getElementById('wind-warning');
+            ui.obstacleWarning = document.getElementById('obstacle-warning');
+            ui.balanceContainer = document.getElementById('balance-container');
+            ui.balancePointer = document.getElementById('balance-pointer');
+            ui.balanceSafeZone = document.getElementById('balance-safe-zone');
+            ui.staminaContainer = document.getElementById('stamina-container');
+            ui.staminaBar = document.getElementById('stamina-bar');
+            ui.staminaText = document.getElementById('stamina-text');
+            ui.startScreen = document.getElementById('start-screen');
+            ui.gameOverScreen = document.getElementById('game-over-screen');
+            ui.resultTitle = document.getElementById('result-title');
+            ui.resultText = document.getElementById('result-text');
+            ui.bgmBtn = document.getElementById('bgm-btn');
+
+            Leaderboard.setupUI(); // 設定排行榜 Modal
+            Leaderboard.updateDisplay(); 
+
+            animate();
+        }
+
+        // --- 國旗生成相關 ---
+        function createFlagTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 160;
+            const ctx = canvas.getContext('2d');
+
+            // 紅底
+            ctx.fillStyle = '#FE0000';
+            ctx.fillRect(0, 0, 256, 160);
+
+            // 藍天
+            ctx.fillStyle = '#000095';
+            ctx.fillRect(0, 0, 128, 80);
+
+            // 白日
+            ctx.fillStyle = '#FFFFFF';
+            const cx = 64, cy = 40, r = 18;
+            
+            // 太陽本體
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 12 道光芒
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 4;
+            for (let i = 0; i < 12; i++) {
+                const angle = (Math.PI * 2 * i) / 12;
+                const x1 = cx + Math.cos(angle) * r;
+                const y1 = cy + Math.sin(angle) * r;
+                const x2 = cx + Math.cos(angle) * (r + 8);
+                const y2 = cy + Math.sin(angle) * (r + 8);
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+
+            const tex = new THREE.CanvasTexture(canvas);
+            return tex;
+        }
+
+        function createFlag(x, y, z) {
+            const group = new THREE.Group();
+            group.position.set(x, y, z);
+
+            // 旗桿
+            const pole = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.5, 0.5, 12, 8),
+                new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.5 })
+            );
+            pole.position.y = 6;
+            group.add(pole);
+
+            // 旗面
+            const geom = new THREE.PlaneGeometry(8, 5, 10, 6);
+            const tex = createFlagTexture();
+            const mat = new THREE.MeshStandardMaterial({ 
+                map: tex, 
+                side: THREE.DoubleSide,
+                roughness: 0.8
+            });
+            const flagMesh = new THREE.Mesh(geom, mat);
+            flagMesh.position.set(4.2, 10, 0); // 旗桿頂端往右延伸
+            group.add(flagMesh);
+
+            flags.push(flagMesh); // 加入陣列以便動畫更新
+            
+            return group;
+        }
+
+        // --- 雲層 ---
+        function createClouds() {
+            const particleCount = 1500;
+            const geom = new THREE.BufferGeometry();
+            const positions = [];
+            const uvs = [];
+            const cloudBase = 150; const cloudTop = 250; const spread = 300;
+            for (let i = 0; i < particleCount; i++) {
+                let x = (Math.random() - 0.5) * spread;
+                let y = cloudBase + Math.random() * (cloudTop - cloudBase);
+                let z = (Math.random() - 0.5) * spread;
+                if (Math.abs(x) < 35 && Math.abs(z) < 35) { x *= 3; z *= 3; }
+                positions.push(x, y, z); uvs.push(0, 0); 
+            }
+            geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+            const canvas = document.createElement('canvas'); canvas.width = 32; canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+            grad.addColorStop(0, 'rgba(255, 255, 255, 0.5)'); grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = grad; ctx.fillRect(0, 0, 32, 32);
+            const tex = new THREE.CanvasTexture(canvas);
+            const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 25, map: tex, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending });
+            cloudSystem = new THREE.Points(geom, mat); scene.add(cloudSystem);
+        }
+
+        function createCrowd() {
+            const count = 500; 
+            const geometry = new THREE.BoxGeometry(0.5, 1.6, 0.5);
+            const material = new THREE.MeshStandardMaterial({ color: 0xffffff });
+            crowdSystem = new THREE.InstancedMesh(geometry, material, count);
+            const dummy = new THREE.Object3D(); const color = new THREE.Color();
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2; const radius = 60 + Math.random() * 80; 
+                dummy.position.set(Math.cos(angle)*radius, 0.8, Math.sin(angle)*radius);
+                dummy.lookAt(0, 0, 0); dummy.updateMatrix();
+                crowdSystem.setMatrixAt(i, dummy.matrix);
+                color.setHSL(Math.random(), 0.8, 0.5); crowdSystem.setColorAt(i, color);
+            }
+            crowdSystem.receiveShadow = true; crowdSystem.castShadow = true; scene.add(crowdSystem);
+        }
+
+        function createSurroundings() {
+            const ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+            ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+            const plaza = new THREE.Mesh(new THREE.PlaneGeometry(120, 120), new THREE.MeshStandardMaterial({ color: 0x666666 }));
+            plaza.rotation.x = -Math.PI / 2; plaza.position.y = 0.1; plaza.receiveShadow = true; scene.add(plaza);
+            const cityGroup = new THREE.Group();
+            for (let i = 0; i < 800; i++) {
+                const w = 8 + Math.random() * 12; const h = 10 + Math.random() * 60; const d = 8 + Math.random() * 12;
+                const buildingMesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({color: 0x555555}));
+                buildingMesh.position.y = h/2;
+                const roofH = 2 + Math.random() * 3;
+                let roofMatColor = Math.random() < 0.3 ? 0xaa3333 : (Math.random() < 0.6 ? 0x33aa33 : 0x3333aa);
+                const roofMesh = new THREE.Mesh(new THREE.BoxGeometry(w-1, roofH, d-1), new THREE.MeshStandardMaterial({color: roofMatColor}));
+                roofMesh.position.y = h + roofH/2;
+                const singleHouse = new THREE.Group(); singleHouse.add(buildingMesh); singleHouse.add(roofMesh);
+                let x = (Math.random()-0.5) * 1800; let z = (Math.random()-0.5) * 1800;
+                if(Math.abs(x) < 120 && Math.abs(z) < 120) { if (x > 0) x += 150; else x -= 150; }
+                singleHouse.position.set(x, 0, z); cityGroup.add(singleHouse);
+            }
+            scene.add(cityGroup);
+        }
+
+        function createWindowTexture() {
+            const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d'); 
+            ctx.fillStyle = '#005f6b'; 
+            ctx.fillRect(0, 0, 512, 512);
+            ctx.fillStyle = 'rgba(135, 206, 235, 0.4)'; 
+            ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(512,0); ctx.lineTo(0,512); ctx.fill();
+            ctx.strokeStyle = '#444'; ctx.lineWidth = 4;
+            for(let i=0; i<8; i++) ctx.strokeRect(i*(512/8), 0, 512/8, 512);
+            for(let i=0; i<12; i++) ctx.strokeRect(0, i*(512/12), 512, 512/12);
+            const tex = new THREE.CanvasTexture(canvas); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(4, 2); return tex;
+        }
+
+        function createRealistic101() {
+            building = new THREE.Group(); 
+            obstacleGroup = new THREE.Group(); 
+            buildingObstacles = []; 
+            
+            const tex = createWindowTexture();
+            const mat = new THREE.MeshStandardMaterial({ 
+                map: tex, 
+                color: 0x44aacc, 
+                metalness: 0.3,  
+                roughness: 0.1   
+            });
+            
+            const base = new THREE.Mesh(new THREE.BoxGeometry(50, 30, 50), mat); 
+            base.position.y = 15; building.add(base);
+
+            // 加入國旗：底座上方 (y=30)，兩側 (x=20, x=-20)
+            const flagL = createFlag(-20, 30, 20);
+            flagL.rotation.y = -Math.PI / 4; // 稍微旋轉角度比較自然
+            building.add(flagL);
+
+            const flagR = createFlag(20, 30, 20);
+            flagR.rotation.y = Math.PI / 4;
+            building.add(flagR);
+
+            for(let i=0; i<8; i++) {
+                const segH = 42; const startY = 30 + (i*segH);
+                const seg = new THREE.Mesh(new THREE.CylinderGeometry(24, 18, segH, 4, 1, false, Math.PI/4), mat);
+                seg.position.y = startY + segH/2; building.add(seg);
+                const rim = new THREE.Mesh(new THREE.BoxGeometry(26, 2, 26), new THREE.MeshStandardMaterial({color: 0x333333}));
+                rim.rotation.y = Math.PI/4; rim.position.y = startY; building.add(rim);
+            }
+            const top = new THREE.Mesh(new THREE.CylinderGeometry(8, 24, 30, 4, 1, false, Math.PI/4), mat);
+            top.position.y = 30 + (8*42) + 15; building.add(top);
+            
+            const spireH = 112; 
+            const spire = new THREE.Mesh(new THREE.CylinderGeometry(1, 5, spireH, 8), mat);
+            spire.position.y = 396 + spireH/2; 
+            building.add(spire);
+            
+            building.rotation.y = 0;
+            
+            scene.add(building);
+            scene.add(obstacleGroup); 
+        }
+
+        function createDetailedPlayer() {
+            player = new THREE.Group();
+            player.scale.set(1.2, 1.2, 1.2); 
+            const suitMat = new THREE.MeshStandardMaterial({color: 0xFF0000, roughness: 0.7}); // 改為紅色上衣
+            const gearMat = new THREE.MeshStandardMaterial({color: 0x222222, roughness: 0.5}); 
+            const bagMat = new THREE.MeshStandardMaterial({color: 0xFFFFFF, roughness: 0.5}); // 新增白色腰包材質
+            const pantsMat = new THREE.MeshStandardMaterial({color: 0x111111, roughness: 0.8});
+            const skinMat = new THREE.MeshStandardMaterial({color: 0xFFDAB9});
+            playerBody = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.3), suitMat);
+            playerBody.position.y = 0.85; player.add(playerBody);
+            
+            // 修正：移動腰包到左後方
+            const waistBag = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.1), bagMat); // 套用白色材質
+            // 左(x<0) 後(z<0) 下(y<0)
+            waistBag.position.set(-0.18, -0.25, -0.15); 
+            playerBody.add(waistBag);
+
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.35, 0.3), skinMat);
+            head.position.y = 1.35; player.add(head);
+            const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 16), new THREE.MeshStandardMaterial({color: 0x8B4513}));
+            helmet.position.y = 1.45; player.add(helmet);
+            function createLimb(x, y, z, isArm) {
+                const group = new THREE.Group(); group.position.set(x, y, z);
+                const upperMat = isArm ? suitMat : pantsMat;
+                const upper = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.4, 0.12), upperMat); upper.position.y = -0.2; group.add(upper);
+                const joint = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.14), gearMat); joint.position.y = -0.4; group.add(joint);
+                const lower = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.4, 0.1), isArm ? skinMat : gearMat); lower.position.y = -0.6; group.add(lower);
+                return group;
+            }
+            armL = createLimb(-0.35, 1.1, 0.3, true); armR = createLimb(0.35, 1.1, 0.3, true);
+            legL = createLimb(-0.2, 0.5, 0, false); legR = createLimb(0.2, 0.5, 0, false);
+            player.add(armL, armR, legL, legR); 
+            
+            phoneMesh = new THREE.Group();
+            const phoneBody = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.3, 0.02), new THREE.MeshStandardMaterial({color: 0x111111}));
+            const phoneScreen = new THREE.Mesh(new THREE.PlaneGeometry(0.13, 0.25), new THREE.MeshBasicMaterial({color: 0x88ccff}));
+            phoneScreen.position.z = 0.011;
+            phoneMesh.add(phoneBody);
+            phoneMesh.add(phoneScreen);
+            phoneMesh.visible = false;
+            armR.children[2].add(phoneMesh);
+            phoneMesh.position.set(0, -0.2, 0.1); 
+            phoneMesh.rotation.x = -Math.PI / 2;
+
+            player.position.set(0, 1.6, 85); 
+            scene.add(player);
+        }
+
+        // 風效：線條流體
+        function createWindVFX() {
+            const count = 1000;
+            const geom = new THREE.BufferGeometry();
+            const positions = [];
+            for(let i = 0; i < count; i++) {
+                const x = (Math.random() - 0.5) * 400;
+                const y = Math.random() * 600;
+                const z = (Math.random() - 0.5) * 300;
+                const len = 5 + Math.random() * 10; 
+                positions.push(x - len/2, y, z); 
+                positions.push(x + len/2, y, z); 
+            }
+            geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            const mat = new THREE.LineBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.1
+            });
+            windLines = new THREE.LineSegments(geom, mat);
+            scene.add(windLines);
+        }
+
+        function setupJoystick() {
+            const zone = document.getElementById('joystick-zone');
+            const stick = document.getElementById('joystick-stick');
+            const maxRadius = 30;
+            let touchStartTime = 0;
+            let touchMoved = false;
+            zone.addEventListener('touchstart', (e) => { e.preventDefault(); joystick.active = true; AudioController.resume(); touchStartTime = Date.now(); touchMoved = false; handleTouch(e.touches[0]); });
+            zone.addEventListener('touchmove', (e) => { e.preventDefault(); if (joystick.active) { touchMoved = true; handleTouch(e.touches[0]); } });
+            const endTouch = (e) => { e.preventDefault(); const touchDuration = Date.now() - touchStartTime; if (touchDuration < 200 && !touchMoved) { keys.space = true; setTimeout(() => { keys.space = false; }, 100); } joystick.active = false; joystick.x = 0; joystick.y = 0; stick.style.transform = `translate(-50%, -50%)`; updateKeysFromJoystick(); };
+            zone.addEventListener('touchend', endTouch); zone.addEventListener('touchcancel', endTouch);
+            function handleTouch(touch) {
+                const rect = zone.getBoundingClientRect(); const centerX = rect.left + rect.width / 2; const centerY = rect.top + rect.height / 2;
+                let dx = touch.clientX - centerX; let dy = touch.clientY - centerY;
+                const distance = Math.sqrt(dx*dx + dy*dy);
+                if (distance > maxRadius) { const ratio = maxRadius / distance; dx *= ratio; dy *= ratio; }
+                stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                joystick.x = dx / maxRadius; joystick.y = -dy / maxRadius; updateKeysFromJoystick();
+            }
+            const jumpBtn = document.getElementById('mobile-jump-btn');
+            jumpBtn.addEventListener('touchstart', (e) => { e.preventDefault(); AudioController.resume(); keys.space = true; });
+            jumpBtn.addEventListener('touchend', (e) => { e.preventDefault(); keys.space = false; });
+        }
+
+        function updateKeysFromJoystick() {
+            const threshold = 0.2;
+            keys.up = joystick.y > threshold; keys.down = joystick.y < -threshold;
+            keys.right = joystick.x > threshold; keys.left = joystick.x < -threshold;
+        }
+
+        function setupInput() {
+            const handleKey = (code, isDown) => {
+                if(code === 'ArrowUp' || code === 'KeyW') keys.up = isDown;
+                if(code === 'ArrowDown' || code === 'KeyS') keys.down = isDown;
+                if(code === 'ArrowLeft' || code === 'KeyA') keys.left = isDown;
+                if(code === 'ArrowRight' || code === 'KeyD') keys.right = isDown;
+                if(code === 'Space') keys.space = isDown;
+            };
+            window.addEventListener('keydown', e => handleKey(e.code, true));
+            window.addEventListener('keyup', e => handleKey(e.code, false));
+            
+            const bgmBtn = document.getElementById('bgm-btn');
+            if(bgmBtn) bgmBtn.onclick = () => { AudioController.toggleBGM(); };
+            
+            const startBtn = document.getElementById('start-btn');
+            
+            // 獨立出開始遊戲邏輯
+            const startGame = () => {
+                AudioController.init(); AudioController.resume();
+                gameState = 'PLAYING'; playerMode = 'WALK';
+                height = 1.6; walkZ = 85; walkX = 0; balance = 0; stamina = MAX_STAMINA;
+                climbVelocity = 0; animCycle = 0; jumpState = 'IDLE'; currentJumpZOffset = 0;
+                
+                // 重置腳步聲循環和手臂旋轉，避免勝利動畫殘留
+                lastStepCycle = 0; 
+                lastSectionIndex = 0;
+                if(armR && armL) {
+                    armR.rotation.set(0,0,0);
+                    armL.rotation.set(0,0,0);
+                }
+
+                startTime = clock.elapsedTime; isTiming = true;
+                player.position.set(0, 1.6, 85);
+                player.rotation.set(0, Math.PI, 0);
+                if(phoneMesh) phoneMesh.visible = false; 
+                if(ui.startScreen) ui.startScreen.classList.add('hidden');
+                if(ui.gameOverScreen) {
+                    ui.gameOverScreen.classList.add('hidden');
+                    ui.gameOverScreen.classList.remove('win-mode');
+                }
+            };
+
+            if(startBtn) startBtn.onclick = startGame;
+            
+            const restartBtn = document.getElementById('restart-btn');
+            if(restartBtn) {
+                restartBtn.onclick = () => {
+                    // 玩家建議直接刷新頁面以確保狀態完全重置
+                    window.location.reload();
+                };
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.1); 
+            const time = clock.elapsedTime;
+            
+            // 更新國旗飄動效果 (Vertex Animation)
+            flags.forEach(flag => {
+                const pos = flag.geometry.attributes.position;
+                for (let i = 0; i < pos.count; i++) {
+                    const x = pos.getX(i);
+                    // 只動旗面右側，固定左側 (x=0 為左側, x=8 為右側)
+                    // 使用 sin 波模擬風吹
+                    const wave = Math.sin(time * 5 + x * 0.5) * (x / 8) * 0.5;
+                    pos.setZ(i, wave);
+                }
+                pos.needsUpdate = true;
+            });
+
+            if(gameState === 'PLAYING') {
+                if (playerMode === 'WALK') updateWalking(dt);
+                else updateClimbing(dt, time);
+                if (isTiming) {
+                    const elapsed = time - startTime;
+                    const mins = Math.floor(elapsed / 60).toString().padStart(2,'0');
+                    const secs = (elapsed % 60).toFixed(2).padStart(5,'0');
+                    if(ui.timerDisplay) ui.timerDisplay.innerText = `${mins}:${secs}`;
+                }
+                AudioController.updateWind(height, MAX_HEIGHT);
+                const windSpeed = Math.floor((height / MAX_HEIGHT) * 180);
+                if(ui.windDisplay) ui.windDisplay.innerText = `風速: ${windSpeed} km/h`;
+            } else if (gameState === 'FALLING') {
+                updateFalling(dt);
+            } else if (gameState === 'WIN') {
+                updateWinAnimation(dt);
+            }
+
+            updateCamera();
+            
+            // 更新風線條 (與風向、風速和高度掛勾)
+            if (windLines && windLines.geometry) {
+                const pos = windLines.geometry.attributes.position;
+                const mat = windLines.material;
+                let intensity = Math.min(1, height / 300) * 0.6 + 0.2; 
+                if (isWindGusting) intensity = 1.0;
+
+                mat.opacity += (intensity * 0.5 - mat.opacity) * dt * 2;
+                
+                // 風速方向 = nextWindDirection (1 or -1) * 速度
+                // 預告階段(非強風)風速較慢，強風時風速快
+                const baseSpeed = isWindGusting ? 400 : 100;
+                const speed = nextWindDirection * baseSpeed * intensity; 
+
+                for(let i = 0; i < pos.count; i+=2) {
+                    pos.array[i*3] += dt * speed;      
+                    pos.array[(i+1)*3] += dt * speed; 
+                    
+                    // 根據風向處理邊界循環
+                    if (nextWindDirection > 0) { // 向右吹
+                        if(pos.array[i*3] > 200) {
+                            const newX = -200;
+                            const y = Math.random() * 600;
+                            const z = (Math.random() - 0.5) * 300;
+                            const len = 5 + Math.random() * 20; 
+                            
+                            pos.array[i*3] = newX - len/2;
+                            pos.array[i*3+1] = y;
+                            pos.array[i*3+2] = z;
+                            
+                            pos.array[(i+1)*3] = newX + len/2;
+                            pos.array[(i+1)*3+1] = y;
+                            pos.array[(i+1)*3+2] = z;
+                        }
+                    } else { // 向左吹
+                        if(pos.array[i*3] < -200) {
+                            const newX = 200;
+                            const y = Math.random() * 600;
+                            const z = (Math.random() - 0.5) * 300;
+                            const len = 5 + Math.random() * 20; 
+                            
+                            pos.array[i*3] = newX + len/2;
+                            pos.array[i*3+1] = y;
+                            pos.array[i*3+2] = z;
+                            
+                            pos.array[(i+1)*3] = newX - len/2;
+                            pos.array[(i+1)*3+1] = y;
+                            pos.array[(i+1)*3+2] = z;
+                        }
+                    }
+                    
+                    if(Math.abs(pos.array[i*3+1] - player.position.y) > 200) {
+                         const newY = player.position.y + (Math.random()-0.5)*300;
+                         pos.array[i*3+1] = newY;
+                         pos.array[(i+1)*3+1] = newY;
+                    }
+                }
+                pos.needsUpdate = true;
+            }
+            
+            if(cloudSystem) cloudSystem.rotation.y += dt * 0.02;
+            renderer.render(scene, camera);
+        }
+
+        function triggerFall() {
+            gameState = 'FALLING'; fallVelocity = 0; player.position.z += 2; AudioController.playFall(); 
+        }
+
+        function updateFalling(dt) {
+            fallVelocity -= 30.0 * dt; 
+            player.position.y += fallVelocity * dt;
+            player.rotation.x += 5 * dt; player.rotation.z += 2 * dt;
+            if (player.position.y < 1.6) {
+                gameState = 'PLAYING'; playerMode = 'WALK';
+                height = 1.6; walkZ = 85; walkX = 0; balance = 0;
+                climbVelocity = 0; fallVelocity = 0; jumpState = 'IDLE';
+                currentJumpZOffset = 0;
+                player.position.set(0, 1.6, 85); player.rotation.set(0, Math.PI, 0);
+                
+                // 摔落重置也需要恢復手臂和腳步聲
+                lastStepCycle = 0;
+                if(armR && armL) { armR.rotation.set(0,0,0); armL.rotation.set(0,0,0); }
+
+                if(ui.balanceContainer) ui.balanceContainer.style.display = 'none';
+                if(ui.staminaContainer) ui.staminaContainer.style.display = 'none';
+                if(ui.staminaText) ui.staminaText.style.display = 'none';
+                if(ui.obstacleWarning) ui.obstacleWarning.style.display = 'none';
+                if(ui.windWarning) ui.windWarning.style.display = 'none';
+                isWindGusting = false; 
+            }
+        }
+
+        function updateWinAnimation(dt) {
+            armR.rotation.x = Math.PI * 0.8; 
+            armR.rotation.z = -0.5; 
+            armR.rotation.y = -0.5;
+            player.rotation.y = Math.sin(clock.elapsedTime) * 0.1;
+        }
+
+        function checkStepSound() {
+            const currentCycle = Math.floor(animCycle / Math.PI);
+            if (currentCycle > lastStepCycle) { AudioController.playStep(); lastStepCycle = currentCycle; }
+        }
+
+        function updateWalking(dt) {
+            const WALK_SPEED = 15.0; 
+            let isMoving = false;
+            
+            if (keys.up) { walkZ -= WALK_SPEED * dt; isMoving = true; }
+            if (keys.down) { walkZ += WALK_SPEED * dt; isMoving = true; }
+            if (keys.left) { walkX -= WALK_SPEED * dt; isMoving = true; }
+            if (keys.right) { walkX += WALK_SPEED * dt; isMoving = true; }
+            
+            walkZ = Math.max(26, Math.min(120, walkZ)); 
+            walkX = Math.max(-40, Math.min(40, walkX));
+            
+            player.position.set(walkX, height, walkZ);
+            player.rotation.set(0, Math.PI, 0);
+            
+            if (walkZ <= 26) {
+                playerMode = 'CLIMB';
+                height = 2.0;
+                balance = walkX / 0.15;
+                if (Math.abs(balance) > 80) balance = 0;
+                if(ui.balanceContainer) ui.balanceContainer.style.display = 'block';
+                if(ui.staminaContainer) ui.staminaContainer.style.display = 'block';
+                if(ui.staminaText) ui.staminaText.style.display = 'block';
+                if(ui.obstacleWarning) ui.obstacleWarning.style.display = 'none';
+                return;
+            }
+            
+            if(ui.heightDisplay) ui.heightDisplay.innerText = `高度: ${Math.floor(height)}m`;
+            stamina = Math.min(MAX_STAMINA, stamina + dt * 100);
+            
+            if (isMoving) {
+                animCycle += dt * 10; 
+                checkStepSound();
+                armL.rotation.x = Math.sin(animCycle) * 0.6;
+                armR.rotation.x = Math.sin(animCycle + Math.PI) * 0.6;
+                armL.position.y = 1.1; armR.position.y = 1.1;
+                legL.position.y = Math.abs(Math.sin(animCycle)) * 0.5;
+                legR.position.y = Math.abs(Math.sin(animCycle + Math.PI)) * 0.5;
+                legL.position.z = Math.sin(animCycle + Math.PI) * 0.5;
+                legR.position.z = Math.sin(animCycle) * 0.5;
+            } else {
+                armL.rotation.x = 0; armR.rotation.x = 0;
+                legL.position.y = 0; legR.position.y = 0;
+                legL.position.z = 0; legR.position.z = 0;
+            }
+        }
+
+        function updateClimbing(dt, time) {
+            player.rotation.set(0, Math.PI, 0);
+
+            const progress = height / MAX_HEIGHT;
+            
+            const gustPeriod = 10.0;
+            const timeInCycle = time % gustPeriod;
+
+            // 修正：風向判斷移到全域計算，確保提示方向與接下來的強風方向一致
+            // 每個週期的 0~10秒內，nextWindDirection 保持不變
+            // 這樣在 0~8秒的平靜期，粒子就會飄向即將來襲的強風方向
+            const currentCycleIndex = Math.floor(time / gustPeriod);
+            nextWindDirection = (currentCycleIndex % 2 === 0) ? 1 : -1; 
+
+            // 修正：將環境風 (windBias) 也與 nextWindDirection 掛勾，避免隨機亂飄
+            // 當風向為 1 (右) 時，環境風會偏向右側 (正值)
+            // 當風向為 -1 (左) 時，環境風會偏向左側 (負值)
+            // 基礎的正弦波 (Math.sin) 用於模擬不穩定的氣流
+            windBias = (Math.sin(time * 0.5) + nextWindDirection * 1.5) * progress * 20;
+            
+            if (timeInCycle > 8.0) {
+                if (!isWindGusting) {
+                    isWindGusting = true;
+                    if(ui.windWarning) ui.windWarning.style.display = 'block';
+                }
+                // 在這裡我們直接使用已經算好的 nextWindDirection
+                gustStrength = nextWindDirection * GUST_FORCE * (0.5 + progress * 0.5); 
+            } else {
+                if (isWindGusting) {
+                    isWindGusting = false;
+                    if(ui.windWarning) ui.windWarning.style.display = 'none';
+                }
+                gustStrength *= 0.95; 
+            }
+            
+            if (keys.space && jumpState === 'IDLE' && stamina >= 25) {
+                if (isWindGusting) {
+                    triggerFall();
+                    if(ui.windWarning) ui.windWarning.style.display = 'block';
+                    return;
+                }
+                stamina -= 25;
+                jumpState = 'PREP';
+                jumpPrepTimer = JUMP_PREP_DURATION;
+                climbVelocity = 0;
+                AudioController.playCharge();
+            }
+
+            if (jumpState === 'PREP') {
+                jumpPrepTimer -= dt;
+                if (jumpPrepTimer <= 0) {
+                    jumpState = 'AIR';
+                    jumpTime = JUMP_DURATION;
+                    climbVelocity = 25.0; 
+                    AudioController.playJump();
+                }
+            }
+
+            let nextHeight = height;
+
+            if (jumpState === 'AIR') {
+                height = height + climbVelocity * dt;
+                climbVelocity -= 15.0 * dt; 
+                jumpTime -= dt;
+
+                if (jumpTime <= 0) {
+                    jumpState = 'IDLE';
+                    climbVelocity = 0;
+                    currentJumpZOffset = 0;
+                    AudioController.playCheer();
+                }
+                
+                player.position.y = height;
+                updateClimbAnimations(dt);
+                updateUI();
+                
+                let zBase = calculateWallZ(height);
+                let targetZOffset = 4.0; 
+                currentJumpZOffset += (targetZOffset - currentJumpZOffset) * dt * 10;
+                
+                let targetZ = zBase + currentJumpZOffset;
+                player.position.z += (targetZ - player.position.z) * dt * 10;
+                player.position.x = balance * 0.15;
+                
+                checkWin();
+                return;
+            } else if (jumpState === 'PREP') {
+                nextHeight = height;
+                climbVelocity = 0;
+            } else {
+                let isExerting = false;
+                let targetAccel = 0;
+
+                if (keys.up) {
+                    isExerting = true;
+                    if (stamina > 0) {
+                        targetAccel = CLIMB_ACCEL;
+                        stamina -= 15 * dt; 
+                    }
+                } else if (keys.down) {
+                    isExerting = true; 
+                    targetAccel = -CLIMB_ACCEL;
+                } else {
+                    if (climbVelocity > 0) targetAccel = -CLIMB_FRICTION;
+                    if (climbVelocity < 0) targetAccel = CLIMB_FRICTION;
+                }
+                
+                climbVelocity += targetAccel * dt;
+                if (!keys.up && !keys.down && Math.abs(climbVelocity) < 0.1) climbVelocity = 0;
+                climbVelocity = Math.max(-MAX_CLIMB_SPEED, Math.min(climbVelocity, MAX_CLIMB_SPEED));
+
+                nextHeight = height + climbVelocity * dt;
+
+                if (keys.left) {
+                    isExerting = true;
+                    if (stamina > 0) {
+                        balance -= 60 * dt;
+                        stamina -= 10 * dt; 
+                    }
+                }
+                if (keys.right) {
+                    isExerting = true;
+                    if (stamina > 0) {
+                        balance += 60 * dt;
+                        stamina -= 10 * dt; 
+                    }
+                }
+
+                if (!isExerting) {
+                    stamina = Math.min(MAX_STAMINA, stamina + 60 * dt); 
+                }
+
+                let obstacleHit = false;
+                let obstacleMsg = "";
+
+                if (nextHeight > 28.5 && nextHeight < 31 && climbVelocity > 0) {
+                    obstacleHit = true; obstacleMsg = "🧱 底座屋簷！按跳躍鍵蓄力";
+                }
+
+                if (!obstacleHit) {
+                    for (let i = 0; i < 8; i++) {
+                        const jointH = 30 + (i + 1) * 42;
+                        if (nextHeight > jointH - 1.0 && nextHeight < jointH + 0.5) {
+                            obstacleHit = true; obstacleMsg = "🧱 遇到屋簷！按跳躍鍵蓄力"; break;
+                        }
+                    }
+                }
+
+                // 移除障礙物判斷
+                // ...
+
+                if (obstacleHit && climbVelocity > 0) {
+                    climbVelocity = 0; nextHeight = height;
+                    if(ui.obstacleWarning) {
+                        ui.obstacleWarning.style.display = 'block';
+                        ui.obstacleWarning.innerText = obstacleMsg;
+                    }
+                } else {
+                    if(ui.obstacleWarning) ui.obstacleWarning.style.display = 'none';
+                }
+            }
+
+            height = nextHeight;
+
+            const sectionHeight = 42;
+            const baseHeight = 30;
+            if (height > baseHeight) {
+                const currentSectionIndex = Math.floor((height - baseHeight) / sectionHeight);
+                if (currentSectionIndex > lastSectionIndex) {
+                    AudioController.playCheer();
+                    lastSectionIndex = currentSectionIndex;
+                }
+            }
+
+            animCycle += climbVelocity * dt * 4.0;
+            if (climbVelocity !== 0) checkStepSound();
+
+            checkWin();
+
+            if (height < 1.5) {
+                playerMode = 'WALK'; height = 1.6; walkZ = 85; walkX = balance * 0.15;
+                if(ui.balanceContainer) ui.balanceContainer.style.display = 'none';
+                if(ui.staminaContainer) ui.staminaContainer.style.display = 'none';
+                if(ui.staminaText) ui.staminaText.style.display = 'none';
+                return;
+            }
+
+            const windInfluenceFactor = 1.0 - progress * 0.6;
+            balance += (windBias + gustStrength) * dt * 0.8 * windInfluenceFactor;
+            
+            balance *= 0.99;
+
+            // 修正：提升避雷針(塔尖)的寬容度
+            let currentBalanceLimit = BALANCE_LIMIT;
+            if (height > 396) {
+                const localH = height - 396;
+                const ratio = Math.min(1, localH / 100);
+                // 之前是 100 -> 15，現在放寬為 100 -> 30 左右 (ratio * 70)
+                // 並且整個乘以 1.1
+                currentBalanceLimit = (100 - ratio * 70) * 1.1; 
+            }
+
+            if (Math.abs(balance) > currentBalanceLimit) { triggerFall(); return; }
+
+            player.position.y = height;
+            player.position.x = balance * 0.15;
+
+            let zBase = calculateWallZ(height);
+            currentJumpZOffset += (0 - currentJumpZOffset) * dt * 5;
+            
+            let targetZ = zBase + currentJumpZOffset;
+            player.position.z += (targetZ - player.position.z) * dt * 10;
+            
+            player.rotation.z = balance * 0.005;
+
+            updateClimbAnimations(dt);
+            updateUI();
+        }
+
+        function calculateWallZ(h) {
+            if (h < 30) {
+                return 25.3;
+            } else if (h < 366) {
+                let segH = 42;
+                let offsetInSeg = (h - 30) % segH;
+                let ratio = offsetInSeg / segH;
+                return (24 - ratio * 6) * 0.95 + 0.3;
+            } else if (h < 396) {
+                 let ratio = (h - 366) / 30;
+                 return (24 - ratio * 16) * 0.95; 
+            } else {
+                return 5;
+            }
+        }
+
+        function checkWin() {
+            if (height > MAX_HEIGHT) {
+                height = MAX_HEIGHT;
+                gameState = 'WIN';
+                isTiming = false;
+                
+                // 修正：強制玩家站在正中央
+                balance = 0;
+                player.position.set(0, MAX_HEIGHT, 0); 
+                
+                if(ui.timerDisplay) finalTime = ui.timerDisplay.innerText;
+                
+                // 儲存排行榜 (確保只存一次)
+                Leaderboard.save(finalTime);
+
+                if(ui.gameOverScreen) {
+                    ui.gameOverScreen.classList.remove('hidden');
+                    // 修正：切換到勝利模式的 UI 樣式
+                    ui.gameOverScreen.classList.add('win-mode');
+                }
+                if(ui.resultTitle) ui.resultTitle.innerText = "攻頂成功！";
+                if(ui.resultText) ui.resultText.innerText = `最終成績: ${finalTime}`;
+                // 顯示手機
+                if(phoneMesh) phoneMesh.visible = true;
+                AudioController.playWin();
+            }
+        }
+
+        function updateClimbAnimations(dt) {
+            const baseRot = -Math.PI * 0.95; 
+            if (jumpState === 'PREP') {
+                playerBody.position.y = 0.6; 
+                armL.position.y = 0.8; armR.position.y = 0.8; 
+                legL.position.y = 0.3; legR.position.y = 0.3; 
+                armL.rotation.x = baseRot + 0.5; armR.rotation.x = baseRot + 0.5;
+            } else if (jumpState === 'AIR') {
+                let jumpProgress = (JUMP_DURATION - jumpTime) / JUMP_DURATION;
+                if (jumpProgress < 0.3) {
+                    armL.position.y = 1.6; armR.position.y = 1.6; legL.position.y = 0.4; legR.position.y = 0.4; 
+                    armL.rotation.x = baseRot - 1.0; armR.rotation.x = baseRot - 1.0;
+                } else if (jumpProgress < 0.8) {
+                    armL.position.y = 1.0; armR.position.y = 1.0; legL.position.y = 0.6; legR.position.y = 0.6; 
+                    armL.rotation.x = baseRot + 0.5; armR.rotation.x = baseRot + 0.5;
+                } else {
+                    armL.position.y = 1.2; armR.position.y = 1.2; legL.position.y = 0.5; legR.position.y = 0.5;
+                    armL.rotation.x = baseRot; armR.rotation.x = baseRot;
+                }
+            } else {
+                let reach = 0.3; let lFactor = Math.sin(animCycle);
+                armL.position.y = 1.1 + lFactor * reach; armL.position.z = 0.3 + Math.max(0, lFactor) * 0.1; armL.rotation.x = baseRot + lFactor * 0.2;
+                let rFactor = Math.sin(animCycle + Math.PI);
+                armR.position.y = 1.1 + rFactor * reach; armR.position.z = 0.3 + Math.max(0, rFactor) * 0.1; armR.rotation.x = baseRot + rFactor * 0.2;
+                legL.position.y = 0.5 + rFactor * 0.25; legR.position.y = 0.5 + lFactor * 0.25; 
+                legL.position.z = 0; legR.position.z = 0;
+                const isIdle = Math.abs(climbVelocity) < 0.1; const breath = isIdle ? Math.sin(clock.elapsedTime * 3) * 0.02 : 0;
+                playerBody.position.y = 0.85 + breath;
+            }
+        }
+
+        function updateCamera() {
+            if (gameState === 'START') {
+                // 修正：為了讓主角佔畫面 50% 且保留仰視 101 的震撼感
+                // 1. 降低鏡頭高度 (Y=0.6) 營造英雄視角
+                // 2. 拉近距離 (Z=87.5, 離主角只有 2.5米)
+                // 3. LookAt 高度設為 45，保持仰視但不至於讓主角跑出畫面外
+                const t = Date.now() * 0.0002;
+                
+                // 鏡頭在主角身後微微擺動
+                camera.position.set(Math.sin(t)*0.8, 2, 90);
+                
+                
+                // 視點看向塔身中段 (45m處)，這樣主角會位於畫面中下且佔比較大，塔身背景依然巨大
+                camera.lookAt(0, 45, 0);
+                
+            } else if (gameState === 'FALLING') {
+                camera.position.set(player.position.x, player.position.y + 10, player.position.z + 20);
+                camera.lookAt(player.position.x, player.position.y, player.position.z);
+            } else if (gameState === 'WIN') {
+                // 修正：勝利視角，360度環繞
+                const angle = Date.now() * 0.0005; // 旋轉速度
+                const radius = 25; // 距離
+                const camX = Math.sin(angle) * radius;
+                const camZ = Math.cos(angle) * radius;
+                
+                // 高度比玩家高一點，往下看
+                const targetPos = new THREE.Vector3(camX, MAX_HEIGHT + 15, camZ);
+                camera.position.lerp(targetPos, 0.05);
+                camera.lookAt(0, MAX_HEIGHT - 2, 0); // 看向玩家中心
+                
+            } else if (playerMode === 'WALK') {
+                const targetPos = new THREE.Vector3(player.position.x, player.position.y + 3, player.position.z + 12);
+                camera.position.lerp(targetPos, 0.1);
+                camera.lookAt(player.position.x, player.position.y + 15, player.position.z - 20);
+            } else {
+                const progress = Math.min(1, height / MAX_HEIGHT);
+                const dist = 12 + progress * 48; 
+                const offset = dist * 0.7; 
+                
+                const targetPos = new THREE.Vector3(
+                    player.position.x + offset, 
+                    player.position.y + offset, 
+                    player.position.z + offset
+                );
+                
+                camera.position.lerp(targetPos, 0.05);
+                camera.lookAt(player.position.x, player.position.y, player.position.z);
+            }
+        }
+
+        function updateUI() {
+            if (playerMode === 'CLIMB') {
+                if(ui.heightDisplay) ui.heightDisplay.innerText = `高度: ${Math.floor(height)}m`;
+                const balPct = 50 + (balance / BALANCE_LIMIT) * 50;
+                if(ui.balancePointer) ui.balancePointer.style.left = `${balPct}%`;
+                const safeW = Math.max(20, 100 - (height/MAX_HEIGHT)*80);
+                if(ui.balanceSafeZone) ui.balanceSafeZone.style.width = `${safeW}px`;
+                if(ui.staminaBar) {
+                    ui.staminaBar.style.transform = `scaleX(${stamina / MAX_STAMINA})`;
+                    if(stamina < 30) ui.staminaBar.style.background = '#ff0000';
+                    else ui.staminaBar.style.background = 'linear-gradient(90deg, #ffeb3b, #ff9800)';
+                }
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
