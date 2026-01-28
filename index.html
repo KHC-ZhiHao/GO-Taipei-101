@@ -295,6 +295,7 @@
             z-index: 50;
             padding: 0 30px;
             box-sizing: border-box;
+            gap: 20px;
         }
 
         #joystick-zone {
@@ -360,7 +361,7 @@
         <div id="height-display">高度: 0m</div>
         <div id="wind-display">風速: 0 km/h</div>
         <div id="wind-warning">⚠️ 強風來襲！請抓緊！</div>
-        <div id="obstacle-warning">🧱 遇到屋簷！按跳躍鍵蓄力</div>
+        <div id="obstacle-warning">🧱 遇到屋簷！按跳躍鍵跳上</div>
     </div>
 
     <div id="stamina-text">體力值</div>
@@ -386,7 +387,7 @@
             <ul style="line-height: 1.6; color: #eee; padding-left: 20px; margin-bottom: 0;">
                 <li><b>移動/攀爬：</b> 方向鍵 / 搖桿</li>
                 <li><b>保持平衡：</b> 當風吹來時，按反方向抵抗強風</li>
-                <li><b>跳躍：</b> 按 <b>空白鍵</b> / 快速雙擊搖桿</li>
+                <li><b>跳躍：</b> 按住 <b>空白鍵</b> 蓄力，放開跳過障礙</li>
                 <li style="color: #ff4444; font-weight: bold;"><b>危險警告：</b> 強風來襲時切勿跳躍，否則會直接被吹落！</li>
                 <li><b>目標：</b> 攻頂 508 公尺，成為最速傳說！</li>
             </ul>
@@ -417,7 +418,7 @@
         <div id="joystick-zone">
             <div id="joystick-stick"></div>
         </div>
-        <div id="mobile-jump-btn" style="display: none;">跳躍</div>
+        <div id="mobile-jump-btn">跳躍</div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -1074,12 +1075,10 @@
         function setupJoystick() {
             const zone = document.getElementById('joystick-zone');
             const stick = document.getElementById('joystick-stick');
-            const maxRadius = 30;
-            let lastTapTime = 0;
-            let touchMoved = false;
-            zone.addEventListener('touchstart', (e) => { e.preventDefault(); joystick.active = true; AudioController.resume(); touchMoved = false; handleTouch(e.touches[0]); });
-            zone.addEventListener('touchmove', (e) => { e.preventDefault(); if (joystick.active) { touchMoved = true; handleTouch(e.touches[0]); } });
-            const endTouch = (e) => { e.preventDefault(); if (!touchMoved) { const now = Date.now(); if (now - lastTapTime < 300) { keys.space = true; setTimeout(() => { keys.space = false; }, 100); lastTapTime = 0; } else { lastTapTime = now; } } joystick.active = false; joystick.x = 0; joystick.y = 0; stick.style.transform = `translate(-50%, -50%)`; updateKeysFromJoystick(); };
+            const maxRadius = 30; 
+            zone.addEventListener('touchstart', (e) => { e.preventDefault(); joystick.active = true; AudioController.resume(); handleTouch(e.touches[0]); });
+            zone.addEventListener('touchmove', (e) => { e.preventDefault(); if (joystick.active) handleTouch(e.touches[0]); });
+            const endTouch = (e) => { e.preventDefault(); joystick.active = false; joystick.x = 0; joystick.y = 0; stick.style.transform = `translate(-50%, -50%)`; updateKeysFromJoystick(); };
             zone.addEventListener('touchend', endTouch); zone.addEventListener('touchcancel', endTouch);
             function handleTouch(touch) {
                 const rect = zone.getBoundingClientRect(); const centerX = rect.left + rect.width / 2; const centerY = rect.top + rect.height / 2;
