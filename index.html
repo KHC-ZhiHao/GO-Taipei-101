@@ -387,7 +387,7 @@
             <ul style="line-height: 1.6; color: #eee; padding-left: 20px; margin-bottom: 0;">
                 <li><b>移動/攀爬：</b> 方向鍵 / 搖桿</li>
                 <li><b>保持平衡：</b> 當風吹來時，按反方向抵抗強風</li>
-                <li><b>跳躍：</b> 按住 <b>空白鍵</b> 蓄力，放開跳過障礙</li>
+                <li><b>跳躍：</b> 按住 <b>空白鍵</b> ，放開跳過障礙</li>
                 <li style="color: #ff4444; font-weight: bold;"><b>危險警告：</b> 強風來襲時切勿跳躍，否則會直接被吹落！</li>
                 <li><b>目標：</b> 攻頂 508 公尺，成為最速傳說！</li>
             </ul>
@@ -1477,14 +1477,14 @@
                 let obstacleMsg = "";
 
                 if (nextHeight > 28.5 && nextHeight < 31 && climbVelocity > 0) {
-                    obstacleHit = true; obstacleMsg = "🧱 底座屋簷！按跳躍鍵蓄力";
+                    obstacleHit = true; obstacleMsg = "🧱 底座屋簷！按跳躍鍵跳上";
                 }
 
                 if (!obstacleHit) {
                     for (let i = 0; i < 8; i++) {
                         const jointH = 30 + (i + 1) * 42;
                         if (nextHeight > jointH - 1.0 && nextHeight < jointH + 0.5) {
-                            obstacleHit = true; obstacleMsg = "🧱 遇到屋簷！按跳躍鍵蓄力"; break;
+                            obstacleHit = true; obstacleMsg = "🧱 遇到屋簷！按跳躍鍵跳上"; break;
                         }
                     }
                 }
